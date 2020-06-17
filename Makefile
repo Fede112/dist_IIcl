@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -g -std=c++11
+CXXFLAGS = -Wall -Wextra -g -std=c++14
 
 SRC = dist_density_peaks.cc            \
       calc_distance.cc

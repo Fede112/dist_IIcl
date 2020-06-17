@@ -8,10 +8,7 @@
 #include <vector>
 
 
-// #define MAX_cID 2353198020 // maximum value for cluster ID
-#define MAX_cID 788 // maximum value for cluster ID
-
-
+#define MAX_cID 2353198020 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -63,57 +60,21 @@ int load_file(std::string filename, std::vector<T> & vector)
 
 
 /*******************************************************************************
-* Find all entries in container which are bigger than a certain threshold
-*
-* It takes iterators as arguments.
+* Sort indexes based on comparing values in v. Indexes are sort in decreasing order.
 * 
-* @param begin initial iterator
-* @param end final iterator
-* @param value of the threshold
-******************************************************************************/
-template<typename I>
-std::vector<std::size_t> find_peaks(I begin, I end, typename std::iterator_traits<I>::value_type const& threshold)
-{
-    std::vector<std::size_t> result;
-
-    for(std::size_t  index = 0; begin != end; ++begin, ++index)
-    {
-        if ((*begin) >= threshold)
-        {
-                result.emplace_back(index);
-        }
-    }
-    return result;
-}
-
-
-/*******************************************************************************
-* Interface to find_peaks(iterator) with containers as input arguments 
-* 
-* @param container datastructure containing the data
-* @param value of the threshold
-******************************************************************************/
-template<typename C, typename V>
-std::vector<std::size_t> find_peaks(C const& container, V const& threshold)
-{
-    return find_peaks(std::begin(container), std::end(container), threshold);
-}
-
-
-/*******************************************************************************
-* Sort indexes based on comparing values in v
-*
 * It uses std::stable_sort instead of std::sort to avoid unnecessary 
 * index re-orderings when v contains elements of equal values.
 *
 * @param v full path to file
 ******************************************************************************/
+
+// TODO: add overflow error check
 template <typename T>
-std::vector<size_t> sort_indexes(const std::vector<T> &v) 
+std::vector<uint32_t> sort_indexes(const std::vector<T> &v) 
 {
 
     // initialize original index locations
-    std::vector<size_t> idx(v.size());
+    std::vector<uint32_t> idx(v.size());
     std::iota(idx.begin(), idx.end(), 0);
 
     std::stable_sort(idx.begin(), idx.end(),
@@ -123,44 +84,73 @@ std::vector<size_t> sort_indexes(const std::vector<T> &v)
 }
 
 
-inline double expDistance(const double distance, const double r2Cut=2.5*2.5)
-{
-    return exp(-distance/r2Cut);
-}
+/*******************************************************************************
+* Find all entries which have a top half value of gamma and minDistance == 1.
+* 
+* @param gamma vector
+* @param minDistance vector
+******************************************************************************/
 
+template<typename GammaC, typename MinDistC>
+std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistance)
+{
+    std::vector<uint32_t> peaksIdx;
+
+    // sort indexes in decreasing order based on gamma
+    auto gammaSortedIdx = sort_indexes(gamma);
+
+    // find index, within gammaSortedIdx, of the first zero element in gamma.
+    auto gammaZeroIt = std::upper_bound(gammaSortedIdx.begin(), gammaSortedIdx.end(), 0, 
+                        [&gamma = static_cast<const std::vector<uint32_t>&>(gamma)] // capture
+                            (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda
+    
+    uint32_t gammaIdxCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
+    
+    for (uint32_t i = 0; i < gammaIdxCut; ++i)
+    {
+        if (minDistance[ gammaSortedIdx[i] ] == 1)
+        {
+            peaksIdx.emplace_back(gammaSortedIdx[i]);
+        }
+    }
+
+    return peaksIdx;
+}
 
 
 
 
 int main(int argc, char **argv)
 {
-	
+    
     // Sparce distance Matrix
     std::vector<NormalizedPair> distanceMat;
 
     // density vector
     // std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
-    std::vector<double> density(MAX_cID+1, 1.0); // MAX_cID+1 because cID starts from 1
+    std::vector<uint32_t> density(MAX_cID+1, 1.0); // MAX_cID+1 because cID starts from 1
+    std::vector<uint32_t> densitySortedId;
 
     // min distance vector
     std::vector<double> minDistance(MAX_cID+1, 0);
 
     // link index vector: for each node 'i' it contains the ID of the closest node with higher density 'link[i]' 
-    std::vector<size_t> link(MAX_cID+1, 0); 
+    std::vector<uint32_t> link(MAX_cID+1, 0); 
     
     // gamma vector (density*minDistance)
-    std::vector<size_t> gamma(MAX_cID+1, 0);
+    std::vector<uint32_t> gammaSortedId; 
+    std::vector<double> gamma(MAX_cID+1, 0);
 
     // vector containing the peaks ids
-    std::vector<size_t> peaksId;
+    std::vector<uint32_t> peaksIdx;
 
     // label vector: cluster label for each node
-    std::vector<size_t> label(MAX_cID+1, 0);
+    std::vector<uint32_t> label(MAX_cID+1, 0);
 
 
-	//-------------------------------------------------------------------------
-	// Argument parser
-	//-------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
+    // Argument parser
+    //-------------------------------------------------------------------------
 
     int opt;
     std::string outFilename={"labels.txt"};
@@ -207,9 +197,13 @@ int main(int argc, char **argv)
 
         for (auto & entry: distanceMat)
         {
-            auto _distance = expDistance(entry.distance, 2.5*2.5);
-            density[entry.ID1] += _distance;
-            density[entry.ID2] += _distance;
+           
+            // density calculated with cut-off = 0.9
+            if (entry.distance < 0.9)
+            {
+                density[entry.ID1] += 1;
+                density[entry.ID2] += 1;
+            }
         }
     }
 
@@ -255,35 +249,27 @@ int main(int argc, char **argv)
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
-    // TODO: check what happens if density is integer
+    // overflow is discarded because 0<=distance<=1
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
+
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-
-    // TODO:first sort wrt gamma
-
-    // TODO: pick half of data with larger gamma
-
-    // TODO: remove everything with minDistance smaller than one (it should remove a lot of points)
-
-    std::vector<size_t> densitySortedId; // it could be reduced to uint32_t
-    densitySortedId = sort_indexes(density);
-
-    // set minDistance for highest density node
-    minDistance[densitySortedId[0]] = 300.;
-
-    peaksId = find_peaks(minDistance, 11.);
-
+    std::cout << "Here" << '\n';
+    peaksIdx = find_peaks(gammaSortedId, minDistance);
+    std::cout << "End" << '\n';
     
     //-------------------------------------------------------------------------
     // Label the points
     //-------------------------------------------------------------------------
+    
+    // Id sorted by density
+    densitySortedId = sort_indexes(density);
 
     // force peaks points to be root nodes, this is, they are linked to themselves
-    for (const auto & pId: peaksId) { link[pId] = pId; }
+    for (const auto & pId: peaksIdx) { link[pId] = pId; }
 
     // cluster 0 will be for nodes with no distanceMat entry
     int clusterLabel = 0;
@@ -313,8 +299,7 @@ int main(int argc, char **argv)
         outFile << label[i] << '\n';
     }
 
-
     // output delta, labels, linking
 
-	return 0;
+    return 0;
 }
