@@ -8,7 +8,8 @@
 #include <vector>
 
 
-#define MAX_cID 2353198020 // maximum value for cluster ID
+// #define MAX_cID 2353198020 // maximum value for cluster ID
+#define MAX_cID 788 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -179,15 +180,20 @@ int main(int argc, char **argv)
 
     while(optind < argc)
     {
+        std::cout << "argv[optind]: " << argv[optind] << '\n';
         filenames.push_back(argv[optind]);
         ++optind;
     }
 
+    std::cout << "outFilename: " << outFilename << '\n';
+    exit(0);
 
     //-------------------------------------------------------------------------
     // Calculate density
     //-------------------------------------------------------------------------
     
+
+
     // loop threw input files
     for (auto filename: filenames)
     {
@@ -257,9 +263,7 @@ int main(int argc, char **argv)
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-    std::cout << "Here" << '\n';
     peaksIdx = find_peaks(gammaSortedId, minDistance);
-    std::cout << "End" << '\n';
     
     //-------------------------------------------------------------------------
     // Label the points
