@@ -192,7 +192,7 @@ int main(int argc, char **argv)
     // Calculate density
     //-------------------------------------------------------------------------
     
-
+    std::cout << "Calculating density ... \n";
 
     // loop threw input files
     for (auto filename: filenames)
@@ -218,6 +218,7 @@ int main(int argc, char **argv)
     // Calculate min distance to higher density points
     //-------------------------------------------------------------------------
 
+    std::cout << "Calculating minimum distance ... \n";
 
     // loop threw input files
     for (auto filename: filenames)
@@ -255,6 +256,8 @@ int main(int argc, char **argv)
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
+    std::cout << "Calculating gamma ... \n";
+
     // overflow is discarded because 0<=distance<=1
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
@@ -263,6 +266,7 @@ int main(int argc, char **argv)
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
+    std::cout << "Finding peaks ... \n";
     peaksIdx = find_peaks(gammaSortedId, minDistance);
     
     //-------------------------------------------------------------------------
