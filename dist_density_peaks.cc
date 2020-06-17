@@ -223,6 +223,7 @@ int main(int argc, char **argv)
     // loop threw input files
     for (auto filename: filenames)
     {
+        std::cout << filename << " entries: " << distanceMat.size() << '\n';
 
         load_file(filename, distanceMat);
 
