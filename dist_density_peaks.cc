@@ -1,4 +1,5 @@
 #include <algorithm>    // std::sort, std::stable_sort
+#include <chrono>
 #include <cmath>        // exp
 #include <fstream>
 #include <iostream>
@@ -8,8 +9,8 @@
 #include <vector>
 
 
-#define MAX_cID 2353198020 // maximum value for cluster ID
-// #define MAX_cID 788 // maximum value for cluster ID
+// #define MAX_cID 2353198020 // maximum value for cluster ID
+#define MAX_cID 788 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -149,6 +150,10 @@ int main(int argc, char **argv)
     std::vector<uint32_t> label(MAX_cID+1, 0);
 
 
+    // timers
+    std::chrono::steady_clock::time_point begin;
+    std::chrono::steady_clock::time_point end;
+
     //-------------------------------------------------------------------------
     // Argument parser
     //-------------------------------------------------------------------------
@@ -191,12 +196,16 @@ int main(int argc, char **argv)
     // Calculate density
     //-------------------------------------------------------------------------
     
-    std::cout << "Calculating density ... \n";
+    std::cout << "\nCalculating density ... \n";
+
+    begin = std::chrono::steady_clock::now();
+
 
     // loop threw input files
     for (auto filename: filenames)
     {
 
+        std::cout << "Loading file.. ";
         load_file(filename, distanceMat);
         std::cout << filename << " entries: " << distanceMat.size() << '\n';
 
@@ -212,18 +221,23 @@ int main(int argc, char **argv)
         }
     }
 
+    end = std::chrono::steady_clock::now();
+
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
     //-------------------------------------------------------------------------
     // Calculate min distance to higher density points
     //-------------------------------------------------------------------------
 
-    std::cout << "Calculating minimum distance ... \n";
+    std::cout << "\nCalculating minimum distance ... \n";
+
+    begin = std::chrono::steady_clock::now();
 
     // loop threw input files
     for (auto filename: filenames)
     {
 
-	std::cout << "Loading file.." << '\n';        
+	std::cout << "Loading file.. ";        
 	load_file(filename,distanceMat);
 	std::cout << filename << " entries: " << distanceMat.size() << '\n';
 
@@ -253,27 +267,37 @@ int main(int argc, char **argv)
         }
     }
 
+    end = std::chrono::steady_clock::now();
+
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+    
     //-------------------------------------------------------------------------
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
-    std::cout << "Calculating gamma ... \n";
+    std::cout << "\nCalculating gamma ... ";
 
     // overflow is discarded because 0<=distance<=1
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
+    std::cout << "Done!\n";
 
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-    std::cout << "Finding peaks ... \n";
+    std::cout << "Finding peaks ... ";
     peaksIdx = find_peaks(gammaSortedId, minDistance);
+    std::cout << "Done!\n";
     
     //-------------------------------------------------------------------------
     // Label the points
     //-------------------------------------------------------------------------
     
+    std::cout << "\nAssigning labels ... \n";
+    
+
+    begin = std::chrono::steady_clock::now();
     // Id sorted by density
     densitySortedId = sort_indexes(density);
 
@@ -296,6 +320,11 @@ int main(int argc, char **argv)
         // TODO: add threshold to the distance (it implies another read of the distanceMat)
         label[sIdx] = label[ link[sIdx] ];
     }
+
+    end = std::chrono::steady_clock::now();
+
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+
     
     
     //-------------------------------------------------------------------------
