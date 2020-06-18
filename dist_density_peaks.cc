@@ -8,8 +8,8 @@
 #include <vector>
 
 
-// #define MAX_cID 2353198020 // maximum value for cluster ID
-#define MAX_cID 788 // maximum value for cluster ID
+#define MAX_cID 2353198020 // maximum value for cluster ID
+// #define MAX_cID 788 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -129,7 +129,7 @@ int main(int argc, char **argv)
 
     // density vector
     // std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
-    std::vector<uint32_t> density(MAX_cID+1, 1.0); // MAX_cID+1 because cID starts from 1
+    std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
     std::vector<uint32_t> densitySortedId;
 
     // min distance vector
@@ -186,7 +186,6 @@ int main(int argc, char **argv)
     }
 
     std::cout << "outFilename: " << outFilename << '\n';
-    exit(0);
 
     //-------------------------------------------------------------------------
     // Calculate density
@@ -223,18 +222,19 @@ int main(int argc, char **argv)
     // loop threw input files
     for (auto filename: filenames)
     {
-        std::cout << filename << " entries: " << distanceMat.size() << '\n';
 
-        load_file(filename, distanceMat);
-
+	std::cout << "Loading file.." << '\n';        
+	load_file(filename,distanceMat);
+	std::cout << filename << " entries: " << distanceMat.size() << '\n';
 
         for (const auto & entry: distanceMat)
         {
-            auto minDensityID = std::min(entry.ID1, entry.ID2, 
-                [&density](const int & i1,const int & i2){return ( density[i1] < density[i2]);});
-            auto maxDensityID = std::max(entry.ID1, entry.ID2, 
-                [&density](const int & i1,const int & i2){return ( density[i1] < density[i2]);});
-            
+	    auto minDensityID = std::min(entry.ID1, entry.ID2, 
+		[&density](uint32_t i1,uint32_t i2){return ( density[i1] < density[i2]);});
+	    
+	    auto maxDensityID = std::max(entry.ID1, entry.ID2, 
+               [&density](uint32_t i1, uint32_t i2){return ( density[i1] < density[i2]);});
+	    
             if (link[minDensityID] == 0)
             {
                 link[minDensityID] = maxDensityID;
