@@ -9,8 +9,8 @@
 #include <vector>
 
 
-// #define MAX_cID 2353198020 // maximum value for cluster ID
-#define MAX_cID 788 // maximum value for cluster ID
+#define MAX_cID 2353198020 // maximum value for cluster ID
+// #define MAX_cID 788 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -124,7 +124,16 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
 
 int main(int argc, char **argv)
 {
-    
+    // timers
+    std::chrono::steady_clock::time_point beginTotal;
+    std::chrono::steady_clock::time_point endTotal;
+    std::chrono::steady_clock::time_point begin;
+    std::chrono::steady_clock::time_point end;
+
+
+    beginTotal = std::chrono::steady_clock::now();
+
+        
     // Sparce distance Matrix
     std::vector<NormalizedPair> distanceMat;
 
@@ -150,9 +159,6 @@ int main(int argc, char **argv)
     std::vector<uint32_t> label(MAX_cID+1, 0);
 
 
-    // timers
-    std::chrono::steady_clock::time_point begin;
-    std::chrono::steady_clock::time_point end;
 
     //-------------------------------------------------------------------------
     // Argument parser
@@ -269,26 +275,30 @@ int main(int argc, char **argv)
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
-    std::cout << "\nCalculating gamma ... ";
+    std::cout << "\nCalculating gamma ... \n";
 
+    begin = std::chrono::steady_clock::now();
     // overflow is discarded because 0<=distance<=1
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
-    std::cout << "Done!\n";
+    end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-    std::cout << "Finding peaks ... ";
+    std::cout << "Finding peaks ... \n";
+    begin = std::chrono::steady_clock::now();
     peaksIdx = find_peaks(gammaSortedId, minDistance);
-    std::cout << "Done!\n";
+    end = std::chrono::steady_clock::now();
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Label the points
@@ -305,8 +315,9 @@ int main(int argc, char **argv)
     for (const auto & pId: peaksIdx) { link[pId] = pId; }
 
     // cluster 0 will be for nodes with no distanceMat entry
-    int clusterLabel = 0;
+    uint32_t clusterLabel = 0;
     
+    // could avoid labeling densitySortedID == 1
     for (const auto & sIdx: densitySortedId)
     {
         // peaks were forced to be root nodes
@@ -314,6 +325,7 @@ int main(int argc, char **argv)
         {
             label[sIdx] = clusterLabel; 
             ++clusterLabel;
+            continue;
         }
         // you have the same label as your parent node 
         
@@ -323,7 +335,7 @@ int main(int argc, char **argv)
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
     
     
@@ -336,6 +348,11 @@ int main(int argc, char **argv)
     {
         outFile << label[i] << '\n';
     }
+
+
+    endTotal = std::chrono::steady_clock::now();
+
+    std::cout << "\nTotal elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(endTotal - beginTotal).count() << "[ms]" << std::endl;
 
     // output delta, labels, linking
 
