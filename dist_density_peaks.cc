@@ -344,9 +344,16 @@ int main(int argc, char **argv)
     //-------------------------------------------------------------------------
 
     std::ofstream outFile(outFilename);
+
+    std::cout << "\n Peaks Idx: \n";
+    for (const auto peak: peaksIdx)
+        std::cout << peak << '\t';
+    std::cout << '\n';
+
+
     for (size_t i = 1; i < label.size(); ++i)
     {
-        outFile << label[i] << '\n';
+        outFile << i << '\t' << label[i] << '\n';
     }
 
 

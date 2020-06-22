@@ -1,3 +1,5 @@
+// find /scratch/external/russoet/CL1_blocks/binfiles/50-files/output -regex ".*\([0-9]\|1[0-9]\)-.\.bin" | sort
+
 #include <algorithm>
 #include <iostream>
 #include <iterator>
