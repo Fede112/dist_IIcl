@@ -9,8 +9,8 @@
 #include <vector>
 
 
-#define MAX_cID 2353198020 // maximum value for cluster ID
-// #define MAX_cID 788 // maximum value for cluster ID
+// #define MAX_cID 2353198020 // maximum value for cluster ID
+#define MAX_cID 3594 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -106,9 +106,11 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
                         [&gamma = static_cast<const std::vector<uint32_t>&>(gamma)] // capture
                             (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda
     
-    uint32_t gammaIdxCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
+    uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
     
-    for (uint32_t i = 0; i < gammaIdxCut; ++i)
+    std::cout << "gammaCut: " << gammaCut << '\n';
+
+    for (uint32_t i = 0; i < gammaCut; ++i)
     {
         if (minDistance[ gammaSortedIdx[i] ] == 1)
         {
@@ -116,6 +118,7 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
         }
     }
 
+    if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
     return peaksIdx;
 }
 
@@ -343,17 +346,15 @@ int main(int argc, char **argv)
     // Output
     //-------------------------------------------------------------------------
 
-    std::ofstream outFile(outFilename);
-
-    std::cout << "\n Peaks Idx: \n";
-    for (const auto peak: peaksIdx)
-        std::cout << peak << '\t';
+    std::cout << "\nPeaks Idx (size= " << peaksIdx.size() << ") \n";
+    for (const auto peak: peaksIdx){    std::cout << peak << '\t';  }
     std::cout << '\n';
 
 
+    std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
-        outFile << i << '\t' << label[i] << '\n';
+        outFile << label[i] << '\n';
     }
 
 
