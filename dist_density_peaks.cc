@@ -101,9 +101,21 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
     // sort indexes in decreasing order based on gamma
     auto gammaSortedIdx = sort_indexes(gamma);
 
+    std::cout << "Gamma Sorted Idx: " << std::endl;
+    for (auto entry: gammaSortedIdx)
+    {
+	std::cout << entry << '\t';
+	std::cout << gamma[entry]<<std::endl;
+    }
+    std::cout << '\n';
+
+    for (auto entry: minDistance)
+	std::cout << entry << '\t';
+    std::cout << '\n';
+
     // find index, within gammaSortedIdx, of the first zero element in gamma.
     auto gammaZeroIt = std::upper_bound(gammaSortedIdx.begin(), gammaSortedIdx.end(), 0, 
-                        [&gamma = static_cast<const std::vector<uint32_t>&>(gamma)] // capture
+                        [&gamma = static_cast<const std::vector<double>&>(gamma)] // capture
                             (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda
     
     uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
@@ -118,7 +130,7 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
         }
     }
 
-    if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
+    // if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
     return peaksIdx;
 }
 
@@ -224,12 +236,15 @@ int main(int argc, char **argv)
             // density calculated with cut-off = 0.9
             if (entry.distance < 0.9)
             {
+		if(entry.ID1 == 2 || entry.ID2 == 2){	std::cout << entry.ID1 << '\t' << entry.ID2 << '\t' << entry.distance << '\n'; }
                 density[entry.ID1] += 1;
                 density[entry.ID2] += 1;
             }
         }
     }
 
+// for (auto entry: density) {std::cout << entry << '\n';}
+exit(0);
     end = std::chrono::steady_clock::now();
 
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
@@ -293,13 +308,14 @@ int main(int argc, char **argv)
     end = std::chrono::steady_clock::now();
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
+    std::cout << "gamma.size(): " << gamma.size() << std::endl;
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
     std::cout << "Finding peaks ... \n";
     begin = std::chrono::steady_clock::now();
-    peaksIdx = find_peaks(gammaSortedId, minDistance);
+    peaksIdx = find_peaks(gamma, minDistance);
     end = std::chrono::steady_clock::now();
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
@@ -354,7 +370,7 @@ int main(int argc, char **argv)
     std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
-        outFile << label[i] << '\n';
+        outFile << i << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
     }
 
 
