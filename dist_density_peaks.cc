@@ -101,25 +101,15 @@ std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistanc
     // sort indexes in decreasing order based on gamma
     auto gammaSortedIdx = sort_indexes(gamma);
 
-    std::cout << "Gamma Sorted Idx: " << std::endl;
-    for (auto entry: gammaSortedIdx)
-    {
-	std::cout << entry << '\t';
-	std::cout << gamma[entry]<<std::endl;
-    }
-    std::cout << '\n';
-
-    for (auto entry: minDistance)
-	std::cout << entry << '\t';
-    std::cout << '\n';
-
     // find index, within gammaSortedIdx, of the first zero element in gamma.
     auto gammaZeroIt = std::upper_bound(gammaSortedIdx.begin(), gammaSortedIdx.end(), 0, 
                         [&gamma = static_cast<const std::vector<double>&>(gamma)] // capture
                             (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda
     
-    uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
     
+//    uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
+    uint32_t gammaCut = (gammaSortedIdx.size())*.5;
+
     std::cout << "gammaCut: " << gammaCut << '\n';
 
     for (uint32_t i = 0; i < gammaCut; ++i)
@@ -232,19 +222,15 @@ int main(int argc, char **argv)
 
         for (auto & entry: distanceMat)
         {
-           
             // density calculated with cut-off = 0.9
             if (entry.distance < 0.9)
-            {
-		if(entry.ID1 == 2 || entry.ID2 == 2){	std::cout << entry.ID1 << '\t' << entry.ID2 << '\t' << entry.distance << '\n'; }
+            {	
                 density[entry.ID1] += 1;
                 density[entry.ID2] += 1;
             }
         }
     }
 
-// for (auto entry: density) {std::cout << entry << '\n';}
-exit(0);
     end = std::chrono::steady_clock::now();
 
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
@@ -267,6 +253,10 @@ exit(0);
 
         for (const auto & entry: distanceMat)
         {
+	
+	    // don't link elements with same density
+            if ( density[entry.ID1] == density[entry.ID2] ) continue;
+
 	    auto minDensityID = std::min(entry.ID1, entry.ID2, 
 		[&density](uint32_t i1,uint32_t i2){return ( density[i1] < density[i2]);});
 	    
@@ -370,7 +360,7 @@ exit(0);
     std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
-        outFile << i << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
+	outFile << i << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
     }
 
 
