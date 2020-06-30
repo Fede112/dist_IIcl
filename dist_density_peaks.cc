@@ -10,7 +10,7 @@
 
 
 // #define MAX_cID 2353198020 // maximum value for cluster ID
-#define MAX_cID 3594 // maximum value for cluster ID
+#define MAX_cID 3593 // maximum value for cluster ID
 
 /*******************************************************************************
 * Data type of the binary input file
@@ -93,30 +93,27 @@ std::vector<uint32_t> sort_indexes(const std::vector<T> &v)
 * @param minDistance vector
 ******************************************************************************/
 
-template<typename GammaC, typename MinDistC>
-std::vector<uint32_t> find_peaks(GammaC const& gamma, MinDistC const& minDistance)
+template<typename densityC, typename MinDistC>
+std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDistance)
 {
     std::vector<uint32_t> peaksIdx;
 
     // sort indexes in decreasing order based on gamma
-    auto gammaSortedIdx = sort_indexes(gamma);
-
+    // auto gammaSortedIdx = sort_indexes(gamma);
     // find index, within gammaSortedIdx, of the first zero element in gamma.
-    auto gammaZeroIt = std::upper_bound(gammaSortedIdx.begin(), gammaSortedIdx.end(), 0, 
-                        [&gamma = static_cast<const std::vector<double>&>(gamma)] // capture
-                            (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda
-    
-    
-//    uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
-    uint32_t gammaCut = (gammaSortedIdx.size())*.5;
+    // auto gammaZeroIt = std::upper_bound(gammaSortedIdx.begin(), gammaSortedIdx.end(), 0, 
+    //                    [&gamma = static_cast<const std::vector<double>&>(gamma)] // capture
+    //                        (int a, int b){ return gamma[a] >= gamma[b]; }); // lambda    
+    // uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
+    // std::cout << "gammaCut: " << gammaCut << '\n';
 
-    std::cout << "gammaCut: " << gammaCut << '\n';
 
-    for (uint32_t i = 0; i < gammaCut; ++i)
+
+    for (uint32_t i = 1; i < minDistance.size(); ++i)
     {
-        if (minDistance[ gammaSortedIdx[i] ] == 1)
+        if (density[i] > 1 && minDistance[ i ] >= 1)
         {
-            peaksIdx.emplace_back(gammaSortedIdx[i]);
+            peaksIdx.emplace_back(i);
         }
     }
 
@@ -145,6 +142,7 @@ int main(int argc, char **argv)
     // density vector
     // std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
     std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
+    density[0]=0; // index 0 should not be used in the dataset, it is used as a void node
     std::vector<uint32_t> densitySortedId;
 
     // min distance vector
@@ -235,6 +233,16 @@ int main(int argc, char **argv)
 
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
+
+    //-------------------------------------------------------------------------
+    // Descending sorting of indexes wrt density 
+    //-------------------------------------------------------------------------
+    // Descending sorting of indexes wrt density 
+    // (auxiliary array used later to label the points)
+    //-------------------------------------------------------------------------
+
+    densitySortedId = sort_indexes(density);
+ 
     //-------------------------------------------------------------------------
     // Calculate min distance to higher density points
     //-------------------------------------------------------------------------
@@ -242,6 +250,12 @@ int main(int argc, char **argv)
     std::cout << "\nCalculating minimum distance ... \n";
 
     begin = std::chrono::steady_clock::now();
+
+
+    // manually assign maximum minDistance to point with highest density
+    link[densitySortedId[0]] = densitySortedId[0];
+    minDistance[densitySortedId[0]] = 20; 
+        
 
     // loop threw input files
     for (auto filename: filenames)
@@ -317,14 +331,12 @@ int main(int argc, char **argv)
     
 
     begin = std::chrono::steady_clock::now();
-    // Id sorted by density
-    densitySortedId = sort_indexes(density);
 
     // force peaks points to be root nodes, this is, they are linked to themselves
     for (const auto & pId: peaksIdx) { link[pId] = pId; }
 
     // cluster 0 will be for nodes with no distanceMat entry
-    uint32_t clusterLabel = 0;
+    uint32_t clusterLabel = 1;
     
     // could avoid labeling densitySortedID == 1
     for (const auto & sIdx: densitySortedId)
@@ -360,7 +372,7 @@ int main(int argc, char **argv)
     std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
-	outFile << i << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
+	outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
     }
 
 
