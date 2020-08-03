@@ -1,5 +1,8 @@
 benchmarks/
 data/
+reference/
 *.bin
 *.txt
 *.x
+test.cc
+test_bis.cc
