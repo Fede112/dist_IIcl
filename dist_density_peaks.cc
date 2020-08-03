@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <numeric>      // std::iota
 #include <unistd.h>     // getopt
 #include <vector>
@@ -60,7 +61,6 @@ int load_file(std::string filename, std::vector<T> & vector)
     return 0;
 }
 
-
 /*******************************************************************************
 * Sort indexes based on comparing values in v. Indexes are sort in decreasing order.
 * 
@@ -107,8 +107,6 @@ std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDis
     // uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
     // std::cout << "gammaCut: " << gammaCut << '\n';
 
-
-
     for (uint32_t i = 1; i < minDistance.size(); ++i)
     {
         if (density[i] > 1 && minDistance[ i ] >= 1)
@@ -120,6 +118,55 @@ std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDis
     // if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
     return peaksIdx;
 }
+
+
+class utriag_matrix {
+    uint32_t dim;
+    std::vector<double> buffer;
+    public:
+    utriag_matrix(uint32_t d): dim(d), buffer( (d*(d+1))/2 ,0 ){}
+    
+    uint32_t size() {return dim;}
+
+    double& at(uint32_t i, uint32_t j)
+    {
+        if(i==j){ throw std::invalid_argument( "at(i,j) with i == j is not a valid element of utriag_matrix." );}
+        if (i>j){std::swap(i,j);}
+        return buffer[dim*i - (i*(i+1))/2 - i + j - 1 ];
+    }
+};
+
+
+// template <typename T>
+// void ascending(T& dFirst, T& dSecond)
+// {
+//     if (dFirst > dSecond)
+//         std::swap(dFirst, dSecond);
+// }
+
+uint32_t find(uint32_t x, std::vector<uint32_t> & labels)
+{
+    // find root label
+    uint32_t y = x;
+    while (labels[y]!=y)
+        y = labels[y];
+
+    while (labels[x] != x)
+    {
+        uint32_t z = labels[x];
+        labels[x] = y;
+        x = z;
+    }
+    return y;
+}
+
+
+void merge(uint32_t l1, uint32_t l2, std::vector<uint32_t> & labels)
+{
+    labels[find(l1, labels)] = find(l2, labels);
+    return;
+}
+
 
 
 
@@ -137,7 +184,7 @@ int main(int argc, char **argv)
 
         
     // Sparce distance Matrix
-    std::vector<NormalizedPair> distanceMat;
+    std::vector<NormalizedPair> pcDistanceMat;
 
     // density vector
     // std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
@@ -158,9 +205,15 @@ int main(int argc, char **argv)
     // vector containing the peaks ids
     std::vector<uint32_t> peaksIdx;
 
+    // population of each metacluster - needed for mc merging
+    typedef std::map<uint32_t, uint32_t> CounterMap;
+    CounterMap mcCounts;
+
     // label vector: cluster label for each node
     std::vector<uint32_t> label(MAX_cID+1, 0);
 
+    // label vector: cluster label for each node
+    std::vector<double> distToPeak(MAX_cID+1, 10000.); // initialized to a number bigger than maximum distance between points
 
 
     //-------------------------------------------------------------------------
@@ -168,7 +221,7 @@ int main(int argc, char **argv)
     //-------------------------------------------------------------------------
 
     int opt;
-    std::string outFilename={"labels.txt"};
+    std::string outFilename={"mc_output.txt"};
     std::vector<std::string> filenames;
 
     while ((opt = getopt(argc, argv, "ho:")) != -1) 
@@ -182,7 +235,7 @@ int main(int argc, char **argv)
             // go to default
 
         default: /* '?' */
-            std::cerr << "Usage: " << argv[0] << " file1 file2 ... [-o output merged file] \n";
+            std::cerr << "Usage: " << argv[0] << " file1 file2... [-o output merged file] \n";
             exit(EXIT_FAILURE);
         }
     }
@@ -205,7 +258,7 @@ int main(int argc, char **argv)
     // Calculate density
     //-------------------------------------------------------------------------
     
-    std::cout << "\nCalculating density ... \n";
+    std::cout << "\nCalculating density... \n";
 
     begin = std::chrono::steady_clock::now();
 
@@ -215,10 +268,10 @@ int main(int argc, char **argv)
     {
 
         std::cout << "Loading file.. ";
-        load_file(filename, distanceMat);
-        std::cout << filename << " entries: " << distanceMat.size() << '\n';
+        load_file(filename, pcDistanceMat);
+        std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
-        for (auto & entry: distanceMat)
+        for (auto & entry: pcDistanceMat)
         {
             // density calculated with cut-off = 0.9
             if (entry.distance < 0.9)
@@ -236,8 +289,6 @@ int main(int argc, char **argv)
 
     //-------------------------------------------------------------------------
     // Descending sorting of indexes wrt density 
-    //-------------------------------------------------------------------------
-    // Descending sorting of indexes wrt density 
     // (auxiliary array used later to label the points)
     //-------------------------------------------------------------------------
 
@@ -247,7 +298,7 @@ int main(int argc, char **argv)
     // Calculate min distance to higher density points
     //-------------------------------------------------------------------------
 
-    std::cout << "\nCalculating minimum distance ... \n";
+    std::cout << "\nCalculating minimum distance... \n";
 
     begin = std::chrono::steady_clock::now();
 
@@ -262,14 +313,14 @@ int main(int argc, char **argv)
     {
 
 	std::cout << "Loading file.. ";        
-	load_file(filename,distanceMat);
-	std::cout << filename << " entries: " << distanceMat.size() << '\n';
+	load_file(filename,pcDistanceMat);
+	std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
-        for (const auto & entry: distanceMat)
+        for (const auto & entry: pcDistanceMat)
         {
 	
 	    // don't link elements with same density
-            if ( density[entry.ID1] == density[entry.ID2] ) continue;
+        if ( density[entry.ID1] == density[entry.ID2] ) continue;
 
 	    auto minDensityID = std::min(entry.ID1, entry.ID2, 
 		[&density](uint32_t i1,uint32_t i2){return ( density[i1] < density[i2]);});
@@ -303,7 +354,7 @@ int main(int argc, char **argv)
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
-    std::cout << "\nCalculating gamma ... \n";
+    std::cout << "\nCalculating gamma... \n";
 
     begin = std::chrono::steady_clock::now();
     // overflow is discarded because 0<=distance<=1
@@ -312,61 +363,211 @@ int main(int argc, char **argv)
     end = std::chrono::steady_clock::now();
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
-    std::cout << "gamma.size(): " << gamma.size() << std::endl;
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-    std::cout << "Finding peaks ... \n";
+    std::cout << "Finding peaks... ";
     begin = std::chrono::steady_clock::now();
     peaksIdx = find_peaks(gamma, minDistance);
     end = std::chrono::steady_clock::now();
+    std::cout << peaksIdx.size() << " peaks found \n";
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Label the points
     //-------------------------------------------------------------------------
     
-    std::cout << "\nAssigning labels ... \n";
+    std::cout << "\nAssigning labels... \n";
     
-
     begin = std::chrono::steady_clock::now();
 
-    // force peaks points to be root nodes, this is, they are linked to themselves
-    for (const auto & pId: peaksIdx) { link[pId] = pId; }
 
-    // cluster 0 will be for nodes with no distanceMat entry
-    uint32_t clusterLabel = 1;
+    // ASSIGN BASED ON DENSITY
+    // // force peaks points to be root nodes, this is, they are linked to themselves
+    // for (const auto & pId: peaksIdx) { link[pId] = pId; }
+
+    // // cluster 0 will be for nodes with no pcDistanceMat entry
+    // uint32_t clusterLabel = 1;
     
-    // could avoid labeling densitySortedID == 1
-    for (const auto & sIdx: densitySortedId)
-    {
-        // peaks were forced to be root nodes
-        if (sIdx == link[sIdx])
-        {
-            label[sIdx] = clusterLabel; 
-            ++clusterLabel;
-            continue;
-        }
-        // you have the same label as your parent node 
+    // // could avoid labeling densitySortedID == 1
+    // for (const auto & sIdx: densitySortedId)
+    // {
+    //     // peaks were forced to be root nodes
+    //     if (sIdx == link[sIdx])
+    //     {
+    //         label[sIdx] = clusterLabel; 
+    //         ++clusterLabel;
+    //         continue;
+    //     }
+    //     // you have the same label as your parent node 
         
-        // TODO: add threshold to the distance (it implies another read of the distanceMat)
-        label[sIdx] = label[ link[sIdx] ];
+    //     // TODO: add threshold to the distance (it implies another read of the pcDistanceMat)
+    //     label[sIdx] = label[ link[sIdx] ];
+    // }
+
+
+    // ASSIGN CONSIDERING MINIMUM DISTANCE TO PEAKS
+
+    // sort peaksIdx (not necessary)
+    // std::stable_sort(peaksIdx.begin(), peaksIdx.end()); //, [](uint32_t i1, uint32_t i2) {return i1 > i2;} );
+
+    // sort peaksIdx wrt gamma
+    std::stable_sort(peaksIdx.begin(), peaksIdx.end(),
+       [&gamma](uint32_t i1, uint32_t i2) {return gamma[i1] > gamma[i2];});
+
+    
+    // label the peaks: labels go from 0 to peaksIdx.size()-1
+    for (uint32_t i = 0; i < peaksIdx.size(); ++i)
+    {
+        label[peaksIdx[i]] = i;
     }
+
+
+    // loop threw all datapoints and compare distance to peaks
+    for (auto filename: filenames)
+    {
+
+    std::cout << "Loading file.. ";        
+    load_file(filename,pcDistanceMat);
+    std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+
+        for (auto & entry: pcDistanceMat)
+        {
+
+            auto itr1 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
+            auto itr2 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID2);
+
+            // if ID1 is a peak
+            if( itr1 != peaksIdx.end())
+            {   
+                // if ID2 is also peak then we don't do anything
+                if(itr2 != peaksIdx.end()){continue;}
+
+                if( distToPeak[entry.ID2] > entry.distance)
+                {
+                    distToPeak[entry.ID2] = entry.distance;
+                    label[entry.ID2] = itr1 - peaksIdx.begin();
+                }
+                else if(distToPeak[entry.ID2] == entry.distance)
+                {
+                    if (gamma[ peaksIdx[label[entry.ID2]] ] < gamma[entry.ID1])
+                    {
+                        distToPeak[entry.ID2] = entry.distance;
+                        label[entry.ID2] =  itr1 - peaksIdx.begin();                        
+                    }
+                }
+                else continue;
+            }
+
+            // if ID2 is a peak
+            if( itr2 != peaksIdx.end() ) 
+            {
+                // if(itr1 != peaksIdx.end()){continue;}
+
+                if( distToPeak[entry.ID1] > entry.distance)
+                {
+                    distToPeak[entry.ID1] = entry.distance;
+                    label[entry.ID1] = itr2 - peaksIdx.begin();
+                }
+                else if(distToPeak[entry.ID1] == entry.distance)
+                {
+                    if (gamma[ peaksIdx[label[entry.ID1]] ] < gamma[entry.ID2])
+                    {
+                        distToPeak[entry.ID1] = entry.distance;
+                        label[entry.ID1] = itr2 - peaksIdx.begin();
+                    }
+                }
+                else continue;  
+
+            } 
+        }
+
+    }
+
+
 
     end = std::chrono::steady_clock::now();
 
     std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
+    //-------------------------------------------------------------------------
+    // Merge metaclusters
+    //-------------------------------------------------------------------------
     
+    // mcPopulation.resize(peaksIdx.size());    
+    // std::fill(mcPopulation.begin(), mcPopulation.end(), 0);
+
+    // Count metacluster population
+    // index 0 is the null position
+    for (uint32_t l = 1; l < label.size(); ++l)
+    {
+        mcCounts[l]++;
+    }
+
+    // for (auto itr = counts.cbegin(); itr != counts.cend(); ++itr)
+    // {
+    //     std::cout << itr->first << '\t' << itr->second << '\n';
+    // }
+
+
+    // metaclusters distance matrix: we only store upper triangular part
+    utriag_matrix mcDistanceMat(peaksIdx.size());
+    std::vector<uint32_t> labels(peaksIdx.size());
+    std::iota(labels.begin(), labels.end(), 0);
+
+    // TODO: move up these definitions with all the vector definitions
+
+    // loop threw all datapoints and add distance to corresponding mc pair
+    for (auto filename: filenames)
+    {
+
+    std::cout << "Loading file.. ";        
+    load_file(filename,pcDistanceMat);
+    std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+
+        for (auto & entry: pcDistanceMat)
+        {
+            if (label[entry.ID1] == label[entry.ID2]) continue;
+            mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += entry.distance;
+        }
+
+    }
+
+    // normalize metacluster distance
+    for (uint32_t i = 0; i < mcDistanceMat.size(); ++i)
+    {
+        for (uint32_t j = i+1; j < mcDistanceMat.size()-1; ++j)
+        {
+            //
+            mcDistanceMat.at(i,j) = (mcDistanceMat.at(i,j)*.5) / (mcCounts[i]*mcCounts[j]);
+
+            if (mcDistanceMat.at(i,j)<0.9)
+            {
+                std::cout << "Merge: " << i << '\t' << j  << '\n';
+                // merge both clusters
+                merge(i,j,labels);
+            }
+        }
+    }
+
+
+    // repaint labels
+    for (size_t i = 1; i < label.size(); ++i)
+        label[i] = find(label[i],labels);
     
     //-------------------------------------------------------------------------
     // Output
     //-------------------------------------------------------------------------
 
-    std::cout << "\nPeaks Idx (size= " << peaksIdx.size() << ") \n";
-    for (const auto peak: peaksIdx){    std::cout << peak << '\t';  }
-    std::cout << '\n';
+    
+
+    // for (int i = MAX_cID - 10; i < MAX_cID+1; ++i)
+    // {
+    //     std::cout << "densitySortedId[i]: " << densitySortedId[i] << '\n';
+    // }
+
+
 
 
     std::ofstream outFile(outFilename);
