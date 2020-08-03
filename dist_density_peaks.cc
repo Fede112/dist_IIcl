@@ -1,4 +1,5 @@
 #include <algorithm>    // std::sort, std::stable_sort
+#include <assert.h>
 #include <chrono>
 #include <cmath>        // exp
 #include <fstream>
@@ -163,19 +164,6 @@ uint32_t find(uint32_t x, std::vector<uint32_t> & labels)
 
 void merge(uint32_t l1, uint32_t l2, std::vector<uint32_t> & labels)
 {
-    if(l1 == 27 && l2 == 31)
-    {
-        std::cout << "find(l2, labels): " << find(l2, labels) << '\n';
-        std::cout << "labels[find(l2, labels)]: " << labels[find(l2, labels)] << '\n';
-        std::cout << "find(l1, labels): " << find(l1, labels) << '\n';
-    }
-
-    if(l1 == 29 && l2 == 31)
-    {
-        std::cout << "find(l2, labels): " << find(l2, labels) << '\n';
-        std::cout << "labels[find(l2, labels)]: " << labels[find(l2, labels)] << '\n';
-        std::cout << "find(l1, labels): " << find(l1, labels) << '\n';
-    }
     labels[find(l2, labels)] = find(l1, labels);
     return;
 }
@@ -297,7 +285,7 @@ int main(int argc, char **argv)
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Density elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
 
     //-------------------------------------------------------------------------
@@ -361,7 +349,7 @@ int main(int argc, char **argv)
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Min. Distance elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Calculate gamma = density*minDistance
@@ -374,7 +362,7 @@ int main(int argc, char **argv)
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
     end = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Gamma elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
 
     //-------------------------------------------------------------------------
@@ -385,7 +373,7 @@ int main(int argc, char **argv)
     peaksIdx = find_peaks(gamma, minDistance);
     end = std::chrono::steady_clock::now();
     std::cout << peaksIdx.size() << " peaks found \n";
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Finding peaks elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Label the points
@@ -426,8 +414,8 @@ int main(int argc, char **argv)
     // std::stable_sort(peaksIdx.begin(), peaksIdx.end()); //, [](uint32_t i1, uint32_t i2) {return i1 > i2;} );
 
     // sort peaksIdx wrt gamma
-    std::stable_sort(peaksIdx.begin(), peaksIdx.end(),
-       [&gamma](uint32_t i1, uint32_t i2) {return gamma[i1] > gamma[i2];});
+    // std::stable_sort(peaksIdx.begin(), peaksIdx.end(),
+       // [&gamma](uint32_t i1, uint32_t i2) {return gamma[i1] > gamma[i2];});
 
     
     // label the peaks: labels go from 0 to peaksIdx.size()-1
@@ -435,6 +423,13 @@ int main(int argc, char **argv)
     {
         label[peaksIdx[i]] = i;
     }
+
+
+    // for (auto entry: peaksIdx)
+    // {
+        // std::cout << "p: " << entry << '\n';
+    // }
+    // exit(0);
 
 
     // loop threw all datapoints and compare distance to peaks
@@ -448,10 +443,13 @@ int main(int argc, char **argv)
         for (auto & entry: pcDistanceMat)
         {
 
-            auto itr1 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
-            auto itr2 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID2);
+            // auto itr1 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
+            // auto itr2 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID2);
+            auto itr1 = std::lower_bound(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
+            if (*itr1 != entry.ID1) itr1 = peaksIdx.end();
+            auto itr2 = std::lower_bound(peaksIdx.begin(), peaksIdx.end(), entry.ID2);
+            if (*itr2 != entry.ID2) itr2 = peaksIdx.end();
 
-            
 
             // if ID1 is a peak
             if( itr1 != peaksIdx.end())
@@ -509,12 +507,17 @@ int main(int argc, char **argv)
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Labeling elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
     //-------------------------------------------------------------------------
     // Merge metaclusters
     //-------------------------------------------------------------------------
     
+    std::cout << "\nMerging metaclusters... \n";
+    
+    begin = std::chrono::steady_clock::now();
+
+
     // mcPopulation.resize(peaksIdx.size());    
     // std::fill(mcPopulation.begin(), mcPopulation.end(), 0);
 
@@ -572,13 +575,9 @@ int main(int argc, char **argv)
             if (mcDistanceMat.at(i,j)<0.9)
             {
                 if (labels[i] == labels[j]) continue;
-                std::cout << "mcDistanceMat.at(i,j): " << mcDistanceMat.at(i,j) << '\n';
-                std::cout << "\nMerge: " << i << '\t' << j  << '\n';
                 // merge both clusters
-                std::cout << "before: " << labels[i] << '\t' << labels[j] << '\n';
                 merge(i,j,labels);
-                std::cout << "after: " << labels[i] << '\t' << labels[j] << '\n';
-            }
+             }
         }
     }
 
@@ -589,6 +588,10 @@ int main(int argc, char **argv)
         if (label[i] < 0) continue;
         label[i] = find(label[i],labels);
     }
+
+    end = std::chrono::steady_clock::now();
+    std::cout << "Merging elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
     
     //-------------------------------------------------------------------------
     // Output
