@@ -1,5 +1,4 @@
 #include <algorithm>    // std::sort, std::stable_sort
-#include <assert.h>
 #include <chrono>
 #include <cmath>        // exp
 #include <fstream>
@@ -110,13 +109,13 @@ std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDis
 
     for (uint32_t i = 1; i < minDistance.size(); ++i)
     {
-        if (density[i] > 1 && minDistance[ i ] >= 1)
+        if (density[i] > 1 && minDistance[i] >= 1)
         {
             peaksIdx.emplace_back(i);
         }
     }
 
-    // if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
+    if (peaksIdx.size() == 0) throw std::runtime_error("No peaks found!");
     return peaksIdx;
 }
 
@@ -289,7 +288,7 @@ int main(int argc, char **argv)
 
 
     //-------------------------------------------------------------------------
-    // Descending sorting of indexes wrt density 
+    // PC indexes sorted in descending order wrt density 
     // (auxiliary array used later to label the points)
     //-------------------------------------------------------------------------
 
@@ -413,7 +412,7 @@ int main(int argc, char **argv)
     // sort peaksIdx (not necessary)
     // std::stable_sort(peaksIdx.begin(), peaksIdx.end()); //, [](uint32_t i1, uint32_t i2) {return i1 > i2;} );
 
-    // sort peaksIdx wrt gamma
+    // sort peaksIdx wrt gamma (included to make labels compatible with reference)
     // std::stable_sort(peaksIdx.begin(), peaksIdx.end(),
        // [&gamma](uint32_t i1, uint32_t i2) {return gamma[i1] > gamma[i2];});
 
@@ -423,13 +422,6 @@ int main(int argc, char **argv)
     {
         label[peaksIdx[i]] = i;
     }
-
-
-    // for (auto entry: peaksIdx)
-    // {
-        // std::cout << "p: " << entry << '\n';
-    // }
-    // exit(0);
 
 
     // loop threw all datapoints and compare distance to peaks
@@ -503,8 +495,6 @@ int main(int argc, char **argv)
 
     }
 
-
-
     end = std::chrono::steady_clock::now();
 
     std::cout << "Labeling elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
@@ -518,21 +508,12 @@ int main(int argc, char **argv)
     begin = std::chrono::steady_clock::now();
 
 
-    // mcPopulation.resize(peaksIdx.size());    
-    // std::fill(mcPopulation.begin(), mcPopulation.end(), 0);
-
     // Count metacluster population
     // index 0 is the null position
     for (uint32_t i = 1; i < label.size(); ++i)
     {
         mcCounts[label[i]]++;
     }
-
-    // for (auto itr = counts.cbegin(); itr != counts.cend(); ++itr)
-    // {
-    //     std::cout << itr->first << '\t' << itr->second << '\n';
-    // }
-
 
     // metaclusters distance matrix: we only store upper triangular part
     utriag_matrix mcDistanceMat(peaksIdx.size());
@@ -553,24 +534,19 @@ int main(int argc, char **argv)
         {
             if (label[entry.ID1] < 0 || label[entry.ID2] <0) continue;
             if (label[entry.ID1] == label[entry.ID2]) continue;
-
             mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += entry.distance;
         }
 
     }
+ 
 
     // normalize metacluster distance
-    // for (uint32_t i = 0; i < 2; ++i)
     for (uint32_t i = 0; i < mcDistanceMat.size(); ++i)
     {
         for (uint32_t j = i+1; j < mcDistanceMat.size(); ++j)
         {
 
-            // std::cout << "mcCounts[i]: " << mcCounts[i] << '\n';
-            // std::cout << "mcCounts[j]: " << mcCounts[j] << '\n';
-            // std::cout << "mcDistanceMat.at(i,j): " << mcDistanceMat.at(i,j) << '\n';
             mcDistanceMat.at(i,j) = (mcDistanceMat.at(i,j)) / (mcCounts[i]*mcCounts[j]);
-            // std::cout << "mcDistanceMat.at(i,j): " << mcDistanceMat.at(i,j) << '\n';
 
             if (mcDistanceMat.at(i,j)<0.9)
             {
@@ -597,42 +573,33 @@ int main(int argc, char **argv)
     // Output
     //-------------------------------------------------------------------------
 
-    
-
-    // for (int i = MAX_cID - 10; i < MAX_cID+1; ++i)
-    // {
-    //     std::cout << "densitySortedId[i]: " << densitySortedId[i] << '\n';
-    // }
-
-
-
 
     std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
-        // outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
-        outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\n';
+        outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
+        // outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\n';
     }
 
-    std::ofstream outLabels("labels_own.txt");
-    for (size_t i = 1; i < label.size(); ++i)
-    {
-        outLabels << label[i] << '\n';
-    }
+    // std::ofstream outLabels("labels.txt");
+    // for (size_t i = 1; i < label.size(); ++i)
+    // {
+    //     outLabels << label[i] << '\n';
+    // }
 
-    std::ofstream outDistII("distII_own.txt");
-    for (size_t i = 0; i < mcDistanceMat.size(); ++i)
-    {
-        for (size_t j = i+1; j < mcDistanceMat.size(); ++j)
-        {
-            outDistII << i+1 << ' ' << j+1 << ' ' << mcDistanceMat.at(i,j) << '\n';
-        }
-    }    
+    // std::ofstream outDistII("distII.txt");
+    // for (size_t i = 0; i < mcDistanceMat.size(); ++i)
+    // {
+    //     for (size_t j = i+1; j < mcDistanceMat.size(); ++j)
+    //     {
+    //         outDistII << i+1 << ' ' << j+1 << ' ' << mcDistanceMat.at(i,j) << '\n';
+    //     }
+    // }    
 
 
     outFile.close();
-    outLabels.close();
-    outDistII.close();
+    // outLabels.close();
+    // outDistII.close();
 
     endTotal = std::chrono::steady_clock::now();
 
