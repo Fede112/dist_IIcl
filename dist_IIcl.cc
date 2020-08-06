@@ -107,6 +107,7 @@ std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDis
     // uint32_t gammaCut = (gammaZeroIt - gammaSortedIdx.begin())*.5;
     // std::cout << "gammaCut: " << gammaCut << '\n';
 
+    // starts from 1 because id=0 is the null node
     for (uint32_t i = 1; i < minDistance.size(); ++i)
     {
         if (density[i] > 1 && minDistance[i] >= 1)
@@ -190,7 +191,7 @@ int main(int argc, char **argv)
     // std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
     std::vector<uint32_t> density(MAX_cID+1, 1); // MAX_cID+1 because cID starts from 1
     density[0]=0; // index 0 should not be used in the dataset, it is used as a void node
-    std::vector<uint32_t> densitySortedId;
+    std::vector<uint32_t> densitySortedIdx;
 
     // min distance vector
     std::vector<double> minDistance(MAX_cID+1, 0);
@@ -199,14 +200,14 @@ int main(int argc, char **argv)
     std::vector<uint32_t> link(MAX_cID+1, 0); 
     
     // gamma vector (density*minDistance)
-    std::vector<uint32_t> gammaSortedId; 
     std::vector<double> gamma(MAX_cID+1, 0);
+    std::vector<uint32_t> gammaSortedIdx; 
 
     // vector containing the peaks ids
     std::vector<uint32_t> peaksIdx;
 
     // population of each metacluster - needed for mc merging
-    typedef std::map<uint32_t, uint32_t> CounterMap;
+    typedef std::map<int32_t, uint32_t> CounterMap;
     CounterMap mcCounts;
 
     // label vector: cluster label for each node
@@ -292,7 +293,7 @@ int main(int argc, char **argv)
     // (auxiliary array used later to label the points)
     //-------------------------------------------------------------------------
 
-    densitySortedId = sort_indexes(density);
+    densitySortedIdx = sort_indexes(density);
  
     //-------------------------------------------------------------------------
     // Calculate min distance to higher density points
@@ -304,8 +305,8 @@ int main(int argc, char **argv)
 
 
     // manually assign maximum minDistance to point with highest density
-    link[densitySortedId[0]] = densitySortedId[0];
-    minDistance[densitySortedId[0]] = 20; 
+    link[densitySortedIdx[0]] = densitySortedIdx[0];
+    minDistance[densitySortedIdx[0]] = 20; 
         
 
     // loop threw input files
@@ -391,7 +392,7 @@ int main(int argc, char **argv)
     // uint32_t clusterLabel = 1;
     
     // // could avoid labeling densitySortedID == 1
-    // for (const auto & sIdx: densitySortedId)
+    // for (const auto & sIdx: densitySortedIdx)
     // {
     //     // peaks were forced to be root nodes
     //     if (sIdx == link[sIdx])
@@ -435,6 +436,9 @@ int main(int argc, char **argv)
         for (auto & entry: pcDistanceMat)
         {
 
+            // don't assign points far away from peak
+            if (entry.distance > 0.9 ) continue;
+            
             // auto itr1 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
             // auto itr2 = std::find(peaksIdx.begin(), peaksIdx.end(), entry.ID2);
             auto itr1 = std::lower_bound(peaksIdx.begin(), peaksIdx.end(), entry.ID1);
@@ -446,14 +450,11 @@ int main(int argc, char **argv)
             // if ID1 is a peak
             if( itr1 != peaksIdx.end())
             {   
-
-                // don't assign points far away from peak
-                if (entry.distance > 0.9) continue;
             
                 // if ID2 is also peak then we don't do anything
-                if(itr2 != peaksIdx.end()){continue;}
+                if ( itr2 != peaksIdx.end() ) continue;
 
-                if( distToPeak[entry.ID2] > entry.distance)
+                if ( distToPeak[entry.ID2] > entry.distance )
                 {
                     distToPeak[entry.ID2] = entry.distance;
                     label[entry.ID2] = itr1 - peaksIdx.begin();
@@ -472,8 +473,6 @@ int main(int argc, char **argv)
             // if ID2 is a peak
             if( itr2 != peaksIdx.end() ) 
             {
-                // don't assign points far away from peak
-                if (entry.distance > 0.9) continue;
 
                 if( distToPeak[entry.ID1] > entry.distance)
                 {
@@ -515,12 +514,14 @@ int main(int argc, char **argv)
         mcCounts[label[i]]++;
     }
 
+
     // metaclusters distance matrix: we only store upper triangular part
     utriag_matrix mcDistanceMat(peaksIdx.size());
+    // array with the MC labels used for labeling the PC
     std::vector<uint32_t> labels(peaksIdx.size());
     std::iota(labels.begin(), labels.end(), 0);
-
     // TODO: move up these definitions with all the vector definitions
+
 
     // loop threw all datapoints and add distance to corresponding mc pair
     for (auto filename: filenames)
@@ -532,7 +533,7 @@ int main(int argc, char **argv)
 
         for (auto & entry: pcDistanceMat)
         {
-            if (label[entry.ID1] < 0 || label[entry.ID2] <0) continue;
+            if (label[entry.ID1] < 0 || label[entry.ID2] < 0) continue;
             if (label[entry.ID1] == label[entry.ID2]) continue;
             mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += entry.distance;
         }
@@ -559,7 +560,7 @@ int main(int argc, char **argv)
 
 
     // repaint labels
-    for (size_t i = 1; i < label.size(); ++i)
+    for (uint32_t i = 1; i < label.size(); ++i)
     {
         if (label[i] < 0) continue;
         label[i] = find(label[i],labels);
