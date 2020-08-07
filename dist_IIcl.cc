@@ -253,24 +253,24 @@ int main(int argc, char **argv)
         ++optind;
     }
 
+    std::cout << "Input files: " << filenames.size() << '\n';
     std::cout << "outFilename: " << outFilename << '\n';
 
     //-------------------------------------------------------------------------
     // Calculate density
     //-------------------------------------------------------------------------
     
-    std::cout << "\nCalculating density... \n";
+    std::cout << "\nCalculating density... ";
 
     begin = std::chrono::steady_clock::now();
 
 
-    // loop threw input files
+        // loop threw input files
     for (auto filename: filenames)
     {
 
-        std::cout << "Loading file.. ";
         load_file(filename, pcDistanceMat);
-        std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+        // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (auto & entry: pcDistanceMat)
         {
@@ -284,7 +284,7 @@ int main(int argc, char **argv)
     }
 
     end = std::chrono::steady_clock::now();
-
+    std::cout << "Finished! \n";
     std::cout << "Density elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
 
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
     // Calculate min distance to higher density points
     //-------------------------------------------------------------------------
 
-    std::cout << "\nCalculating minimum distance... \n";
+    std::cout << "\nCalculating minimum distance... ";
 
     begin = std::chrono::steady_clock::now();
 
@@ -309,13 +309,13 @@ int main(int argc, char **argv)
     minDistance[densitySortedIdx[0]] = 20; 
         
 
+	        
     // loop threw input files
     for (auto filename: filenames)
     {
 
-	std::cout << "Loading file.. ";        
 	load_file(filename,pcDistanceMat);
-	std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+	// std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (const auto & entry: pcDistanceMat)
         {
@@ -348,27 +348,29 @@ int main(int argc, char **argv)
     }
 
     end = std::chrono::steady_clock::now();
-
+    std::cout << "Finished! \n";
     std::cout << "Min. Distance elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //-------------------------------------------------------------------------
     // Calculate gamma = density*minDistance
     //-------------------------------------------------------------------------
 
-    std::cout << "\nCalculating gamma... \n";
+    std::cout << "\nCalculating gamma... ";
 
     begin = std::chrono::steady_clock::now();
     // overflow is discarded because 0<=distance<=1
     std::transform( density.begin(), density.end(), minDistance.begin(), gamma.begin(),
                 std::multiplies<double>() ); 
+    
     end = std::chrono::steady_clock::now();
+    std::cout << "Finished! \n";
     std::cout << "Gamma elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
 
     //-------------------------------------------------------------------------
     // Find peaks 
     //-------------------------------------------------------------------------
-    std::cout << "Finding peaks... ";
+    std::cout << "\nFinding peaks... ";
     begin = std::chrono::steady_clock::now();
     peaksIdx = find_peaks(gamma, minDistance);
     end = std::chrono::steady_clock::now();
@@ -379,7 +381,7 @@ int main(int argc, char **argv)
     // Label the points
     //-------------------------------------------------------------------------
     
-    std::cout << "\nAssigning labels... \n";
+    std::cout << "\nAssigning labels... ";
     
     begin = std::chrono::steady_clock::now();
 
@@ -425,13 +427,13 @@ int main(int argc, char **argv)
     }
 
 
+            
     // loop threw all datapoints and compare distance to peaks
     for (auto filename: filenames)
     {
 
-    std::cout << "Loading file.. ";        
     load_file(filename,pcDistanceMat);
-    std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+    // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (auto & entry: pcDistanceMat)
         {
@@ -495,14 +497,14 @@ int main(int argc, char **argv)
     }
 
     end = std::chrono::steady_clock::now();
-
+    std::cout << "Finished! \n";
     std::cout << "Labeling elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
     //-------------------------------------------------------------------------
     // Merge metaclusters
     //-------------------------------------------------------------------------
     
-    std::cout << "\nMerging metaclusters... \n";
+    std::cout << "\nMerging metaclusters... ";
     
     begin = std::chrono::steady_clock::now();
 
@@ -524,12 +526,12 @@ int main(int argc, char **argv)
 
 
     // loop threw all datapoints and add distance to corresponding mc pair
+            
     for (auto filename: filenames)
     {
 
-    std::cout << "Loading file.. ";        
     load_file(filename,pcDistanceMat);
-    std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+    // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (auto & entry: pcDistanceMat)
         {
@@ -567,6 +569,7 @@ int main(int argc, char **argv)
     }
 
     end = std::chrono::steady_clock::now();
+    std::cout << "Finished! \n";
     std::cout << "Merging elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
     
@@ -603,8 +606,9 @@ int main(int argc, char **argv)
     // outDistII.close();
 
     endTotal = std::chrono::steady_clock::now();
-
-    std::cout << "\nTotal elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(endTotal - beginTotal).count() << "[ms]" << std::endl;
+    std::cout << "\n-------------------------------------" << '\n';
+    std::cout << "Total elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(endTotal - beginTotal).count() << "[ms]" << std::endl;
+    std::cout << "-------------------------------------" << '\n';
 
     // output delta, labels, linking
 
