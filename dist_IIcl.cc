@@ -194,7 +194,7 @@ int main(int argc, char **argv)
     std::vector<uint32_t> densitySortedIdx;
 
     // min distance vector
-    std::vector<double> minDistance(MAX_cID+1, 0);
+    std::vector<double> minDistance(MAX_cID+1, 1);
 
     // link index vector: for each node 'i' it contains the ID of the closest node with higher density 'link[i]' 
     std::vector<uint32_t> link(MAX_cID+1, 0); 
