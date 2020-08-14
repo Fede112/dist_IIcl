@@ -125,7 +125,7 @@ class utriag_matrix {
     uint32_t dim;
     std::vector<double> buffer;
     public:
-    utriag_matrix(uint32_t d): dim(d), buffer( (d*(d+1))/2 ,0 ){}
+    utriag_matrix(uint32_t d): dim(d), buffer( ( (d*(d-1))/2 ) ,0 ){}
     
     uint32_t size() {return dim;}
 
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     std::vector<uint32_t> peaksIdx;
 
     // population of each metacluster - needed for mc merging
-    typedef std::map<int32_t, uint32_t> CounterMap;
+    typedef std::map<int, uint32_t> CounterMap;
     CounterMap mcCounts;
 
     // label vector: cluster label for each node
@@ -504,7 +504,7 @@ int main(int argc, char **argv)
     // Merge metaclusters
     //-------------------------------------------------------------------------
     
-    std::cout << "\nMerging metaclusters... ";
+    std::cout << "\nMerging metaclusters... " << std::endl;
     
     begin = std::chrono::steady_clock::now();
 
@@ -517,11 +517,14 @@ int main(int argc, char **argv)
     }
 
 
+    std::cout << "Finished mcCounts" << std::endl;
     // metaclusters distance matrix: we only store upper triangular part
     utriag_matrix mcDistanceMat(peaksIdx.size());
+    std::cout << "Finished mcDistanceMat allocation" << std::endl;
     // array with the MC labels used for labeling the PC
     std::vector<uint32_t> labels(peaksIdx.size());
     std::iota(labels.begin(), labels.end(), 0);
+    std::cout << "Finished labels vector allocation" << std::endl;
     // TODO: move up these definitions with all the vector definitions
 
 
@@ -530,8 +533,8 @@ int main(int argc, char **argv)
     for (auto filename: filenames)
     {
 
-    load_file(filename,pcDistanceMat);
-    // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+        load_file(filename,pcDistanceMat);
+        // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (auto & entry: pcDistanceMat)
         {
@@ -542,6 +545,7 @@ int main(int argc, char **argv)
 
     }
  
+    std::cout << "Finished distance matrix addition" << std::endl;
 
     // normalize metacluster distance
     for (uint32_t i = 0; i < mcDistanceMat.size(); ++i)
@@ -560,6 +564,7 @@ int main(int argc, char **argv)
         }
     }
 
+    std::cout << "Finished distance matrix normalization" << std::endl;
 
     // repaint labels
     for (uint32_t i = 1; i < label.size(); ++i)
