@@ -122,14 +122,14 @@ std::vector<uint32_t> find_peaks(densityC const& density, MinDistC const& minDis
 
 
 class utriag_matrix {
-    uint32_t dim;
+    size_t dim;
     std::vector<double> buffer;
     public:
-    utriag_matrix(uint32_t d): dim(d), buffer( ( (d*(d-1))/2 ) ,0 ){}
+    utriag_matrix(size_t d): dim(d), buffer( ( (d*(d-1))/2 ) ,0 ){}
     
-    uint32_t size() {return dim;}
+    size_t size() {return dim;}
 
-    double& at(uint32_t i, uint32_t j)
+    double& at(size_t i, size_t j)
     {
         if(i==j){ throw std::invalid_argument( "at(i,j) with i == j is not a valid element of utriag_matrix." );}
         if (i>j){std::swap(i,j);}
