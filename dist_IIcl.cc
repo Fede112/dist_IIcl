@@ -11,6 +11,7 @@
 
 
 // #define MAX_cID 2353198020 // maximum value for cluster ID
+// #define MAX_cID 35930 // maximum value for cluster ID
 #define MAX_cID 3593 // maximum value for cluster ID
 
 /*******************************************************************************
@@ -133,7 +134,7 @@ class utriag_matrix {
     {
         if(i==j){ throw std::invalid_argument( "at(i,j) with i == j is not a valid element of utriag_matrix." );}
         if (i>j){std::swap(i,j);}
-        return buffer[dim*i - (i*(i+1))/2 - i + j - 1 ];
+        return buffer[dim*i - (i*(i+1))/2 - i + j - 1];
     }
 };
 
@@ -144,6 +145,7 @@ class utriag_matrix {
 //     if (dFirst > dSecond)
 //         std::swap(dFirst, dSecond);
 // }
+
 
 uint32_t find(uint32_t x, std::vector<uint32_t> & labels)
 {
@@ -167,8 +169,7 @@ void merge(uint32_t l1, uint32_t l2, std::vector<uint32_t> & labels)
     labels[find(l2, labels)] = find(l1, labels);
     return;
 }
-
-
+     
 
 
 
@@ -265,7 +266,7 @@ int main(int argc, char **argv)
     begin = std::chrono::steady_clock::now();
 
 
-        // loop threw input files
+    // loop threw input files
     for (auto filename: filenames)
     {
 
@@ -377,6 +378,16 @@ int main(int argc, char **argv)
     std::cout << peaksIdx.size() << " peaks found \n";
     std::cout << "Finding peaks elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
+    // Debug output
+    std::ofstream outPeaksIdx("peaksIdx.txt");
+    for (size_t i = 0; i < peaksIdx.size(); ++i)
+    {
+        outPeaksIdx << peaksIdx[i] << '\n';
+    }
+
+    outPeaksIdx.close();
+
+
     //-------------------------------------------------------------------------
     // Label the points
     //-------------------------------------------------------------------------
@@ -432,8 +443,8 @@ int main(int argc, char **argv)
     for (auto filename: filenames)
     {
 
-    load_file(filename,pcDistanceMat);
-    // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
+        load_file(filename,pcDistanceMat);
+        // std::cout << filename << " entries: " << pcDistanceMat.size() << '\n';
 
         for (auto & entry: pcDistanceMat)
         {
@@ -456,12 +467,12 @@ int main(int argc, char **argv)
                 // if ID2 is also peak then we don't do anything
                 if ( itr2 != peaksIdx.end() ) continue;
 
-                if ( distToPeak[entry.ID2] > entry.distance )
+                if ( entry.distance < distToPeak[entry.ID2] )
                 {
                     distToPeak[entry.ID2] = entry.distance;
                     label[entry.ID2] = itr1 - peaksIdx.begin();
                 }
-                else if(distToPeak[entry.ID2] == entry.distance)
+                else if( distToPeak[entry.ID2] == entry.distance )
                 {
                     if (gamma[ peaksIdx[label[entry.ID2]] ] < gamma[entry.ID1])
                     {
@@ -469,6 +480,8 @@ int main(int argc, char **argv)
                         label[entry.ID2] =  itr1 - peaksIdx.begin();                        
                     }
                 }
+                //remove:// if(entry.ID2 == 21890){std::cout << "\nlabel[21890]: " << label[21890] << '\t' << entry.ID1 << '\t' << entry.distance << '\t' << gamma[entry.ID1] << '\t' << density[entry.ID1] <<  '\n';}
+
                 else continue;
             }
 
@@ -489,6 +502,7 @@ int main(int argc, char **argv)
                         label[entry.ID1] = itr2 - peaksIdx.begin();
                     }
                 }
+
                 else continue;  
 
             } 
@@ -499,6 +513,20 @@ int main(int argc, char **argv)
     end = std::chrono::steady_clock::now();
     std::cout << "Finished! \n";
     std::cout << "Labeling elapsed time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
+
+    // Debug output
+    std::ofstream outLabelsbefore("labels_before_merge.txt");
+    for (size_t i = 1; i < label.size(); ++i)
+    {
+        outLabelsbefore << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
+    }
+
+    outLabelsbefore.close();
+
+
+
+
 
     //-------------------------------------------------------------------------
     // Merge metaclusters
@@ -517,19 +545,15 @@ int main(int argc, char **argv)
     }
 
 
-    std::cout << "Finished mcCounts" << std::endl;
     // metaclusters distance matrix: we only store upper triangular part
     utriag_matrix mcDistanceMat(peaksIdx.size());
-    std::cout << "Finished mcDistanceMat allocation" << std::endl;
     // array with the MC labels used for labeling the PC
     std::vector<uint32_t> labels(peaksIdx.size());
     std::iota(labels.begin(), labels.end(), 0);
-    std::cout << "Finished labels vector allocation" << std::endl;
     // TODO: move up these definitions with all the vector definitions
 
 
     // loop threw all datapoints and add distance to corresponding mc pair
-            
     for (auto filename: filenames)
     {
 
@@ -545,7 +569,7 @@ int main(int argc, char **argv)
 
     }
  
-    std::cout << "Finished distance matrix addition" << std::endl;
+
 
     // normalize metacluster distance
     for (uint32_t i = 0; i < mcDistanceMat.size(); ++i)
@@ -564,6 +588,7 @@ int main(int argc, char **argv)
         }
     }
 
+
     std::cout << "Finished distance matrix normalization" << std::endl;
 
     // repaint labels
@@ -572,6 +597,8 @@ int main(int argc, char **argv)
         if (label[i] < 0) continue;
         label[i] = find(label[i],labels);
     }
+
+
 
     end = std::chrono::steady_clock::now();
     std::cout << "Finished! \n";
@@ -586,8 +613,9 @@ int main(int argc, char **argv)
     std::ofstream outFile(outFilename);
     for (size_t i = 1; i < label.size(); ++i)
     {
+        // if(i%10 == 0)
+        // outFile << (i/10)-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
         outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\t' << label[i] << '\n';
-        // outFile << i-1 << '\t' << density[i] << '\t' << minDistance[i] << '\n';
     }
 
     // std::ofstream outLabels("labels.txt");
@@ -596,19 +624,22 @@ int main(int argc, char **argv)
     //     outLabels << label[i] << '\n';
     // }
 
-    // std::ofstream outDistII("distII.txt");
+
+    // Debug output
+    std::ofstream outDistII("distII.txt");
     // for (size_t i = 0; i < mcDistanceMat.size(); ++i)
-    // {
-    //     for (size_t j = i+1; j < mcDistanceMat.size(); ++j)
-    //     {
-    //         outDistII << i+1 << ' ' << j+1 << ' ' << mcDistanceMat.at(i,j) << '\n';
-    //     }
-    // }    
+    for (size_t i = 1000; i < 2000; ++i)
+    {
+        for (size_t j = i+1; j < mcDistanceMat.size(); ++j)
+        {
+            outDistII << i+1 << ' ' << j+1 << ' ' << mcDistanceMat.at(i,j) << '\n';
+        }
+    }    
 
 
     outFile.close();
     // outLabels.close();
-    // outDistII.close();
+    outDistII.close();
 
     endTotal = std::chrono::steady_clock::now();
     std::cout << "\n-------------------------------------" << '\n';
