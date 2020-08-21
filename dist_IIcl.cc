@@ -564,7 +564,7 @@ int main(int argc, char **argv)
         {
             if (label[entry.ID1] < 0 || label[entry.ID2] < 0) continue;
             if (label[entry.ID1] == label[entry.ID2]) continue;
-            mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += entry.distance;
+            mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += (1. - entry.distance);
         }
 
     }
@@ -577,7 +577,8 @@ int main(int argc, char **argv)
         for (uint32_t j = i+1; j < mcDistanceMat.size(); ++j)
         {
 
-            mcDistanceMat.at(i,j) = (mcDistanceMat.at(i,j)) / (mcCounts[i]*mcCounts[j]);
+
+            mcDistanceMat.at(i,j) = 1. - (mcDistanceMat.at(i,j)) / (mcCounts[i]*mcCounts[j]);
 
             if (mcDistanceMat.at(i,j)<0.9)
             {
