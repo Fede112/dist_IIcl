@@ -578,7 +578,7 @@ int main(int argc, char **argv)
         {
 
 
-            mcDistanceMat.at(i,j) = 1. - (mcDistanceMat.at(i,j)) / (mcCounts[i]*mcCounts[j]);
+            mcDistanceMat.at(i,j) = 1. - ((mcDistanceMat.at(i,j)) / (mcCounts[i]*mcCounts[j]));
 
             if (mcDistanceMat.at(i,j)<0.9)
             {
