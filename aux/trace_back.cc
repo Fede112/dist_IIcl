@@ -23,6 +23,8 @@
 
 
 #define MAX_qID 4000
+// #define MAX_qID 2353198020
+
 
 //-------------------------------------------------------------------------
 // Data types
@@ -312,7 +314,8 @@ std::vector<SequenceLabel> match_search_label(SmallCA * clusterAlign,  std::vect
         // add cluster size to the list
         for (auto p = low; p < high; ++p)
         {
-            searchLabel.emplace_back(SequenceLabel(p->sID, p->sstart, p->send, val%7)); // label[val-1]
+            // we use val-1 instead of val=qID because the label array is shifted by one (qID 0 is not possible)
+            searchLabel.emplace_back(SequenceLabel(p->sID, p->sstart, p->send, label[val-1])); // val%7 
         }
 
         // move to next element in vector (not immediate next)
@@ -442,43 +445,44 @@ int main(int argc, char *argv[])
     searchLabel = match_search_label(bufferCA, label, totalLines);
 
     
-
-    for (int i = 0; i < 10; ++i)
-    {
-    	printSCA(bufferCA[i]);
-    	printSL(searchLabel[i]);
-    }
-
     delete [] bufferCA;
 
 
+    // sort wrt to sID
+    radix_sort((unsigned char*) searchLabel.data(), searchLabel.size(), 12, 4, 0);
+    
+    // sort wrt label
     radix_sort((unsigned char*) searchLabel.data(), searchLabel.size(), 12, 4, 8);
 
     // Sequence label sorted wrt label
     std::cout << "Check if file is sorted wrt label: " << std::is_sorted(searchLabel.begin(), searchLabel.end(), compare_label()) << std::endl;
 
-    // for (int i = 0; i < searchLabel.size(); ++i)
-    // {
-    // 	printSL(searchLabel[i]);
-    // }
 
 
 
 
     // split output into different files ordered by sID and metaclusters
 
-    size_t avgLines = int(searchLabel.size() / filenames.size());
+    size_t avgLines = size_t(searchLabel.size() / filenames.size());
+    std::cout << "filenames.size(): " << filenames.size() << '\n';
     std::cout << "avgLines: " << avgLines << '\n';
     std::cout << "searchLabel.size(): " << searchLabel.size() << '\n';
     auto localStartIt = searchLabel.begin();
     auto localEndIt = localStartIt;
-    for (int i = 1; i < filenames.size(); ++i)
+    for (int i = 1; i <= filenames.size(); ++i)
     {
     	std::string outFilename = outPath + "sequence-labels_" + std::to_string(i) + ".bin";
     	std::cout << "outFilename: " << outFilename << '\n';
     	std::ofstream FILE(outFilename, std::ofstream::binary);
 		
-    	localEndIt = std::lower_bound(localStartIt, localStartIt + avgLines, (localStartIt + avgLines)->label, compare_label());
+
+        if ( (searchLabel.end() - (localStartIt + avgLines)) <= 0 )
+        {
+            std::cout << "used end!" << '\n';
+            localEndIt = searchLabel.end();
+        }
+        else
+            localEndIt = std::upper_bound(localStartIt, searchLabel.end(), (localStartIt + avgLines)->label, compare_label());
 
     	auto diff = localEndIt - localStartIt;
     	std::cout << "diff: " << diff << '\n';
@@ -491,15 +495,6 @@ int main(int argc, char *argv[])
 
     }
 
-
-    //TODO: has bug because if label doesnt change you are screwed
-
-    std::string outFilename = outPath + "sequence-labels_" + std::to_string(filenames.size()) + ".bin";
-	std::cout << "outFilename: " << outFilename << '\n';
-	std::ofstream FILE(outFilename, std::ios::out | std::ofstream::binary);
-		
-	FILE.write((char*)&(*localStartIt), (searchLabel.end() - localStartIt) * sizeof(SequenceLabel));
-	FILE.close();
 
     return 0;
 
