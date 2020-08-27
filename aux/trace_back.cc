@@ -295,6 +295,7 @@ int load_labels(std::string filename, std::vector<T> & vector)
 
 std::vector<SequenceLabel> match_search_label(SmallCA * clusterAlign,  std::vector<int> &label, const uint64_t length)
 {
+    // Note that as implemented, all values have a label even if they are not present in the dmatII
     auto end = clusterAlign + length;
     auto low = clusterAlign;
 
@@ -315,7 +316,8 @@ std::vector<SequenceLabel> match_search_label(SmallCA * clusterAlign,  std::vect
         for (auto p = low; p < high; ++p)
         {
             // we use val-1 instead of val=qID because the label array is shifted by one (qID 0 is not possible)
-            searchLabel.emplace_back(SequenceLabel(p->sID, p->sstart, p->send, label[val-1])); // val%7 
+            if (label[val-1]<0){continue;} // skip non assign values
+            searchLabel.emplace_back(SequenceLabel(p->sID, p->sstart, p->send, label[val-1])    ); //  
         }
 
         // move to next element in vector (not immediate next)
@@ -451,7 +453,11 @@ int main(int argc, char *argv[])
     // sort wrt to sID
     radix_sort((unsigned char*) searchLabel.data(), searchLabel.size(), 12, 4, 0);
     
+
     // sort wrt label
+    // TODO: solve future source of bug!!:
+    // I am abusing the use of radix_sort since it doesn't handle negative values!
+    // the only negative label is -9 which translates to: 4294967287.
     radix_sort((unsigned char*) searchLabel.data(), searchLabel.size(), 12, 4, 8);
 
     // Sequence label sorted wrt label
@@ -469,6 +475,8 @@ int main(int argc, char *argv[])
     std::cout << "searchLabel.size(): " << searchLabel.size() << '\n';
     auto localStartIt = searchLabel.begin();
     auto localEndIt = localStartIt;
+
+
     for (int i = 1; i <= filenames.size(); ++i)
     {
     	std::string outFilename = outPath + "sequence-labels_" + std::to_string(i) + ".bin";
@@ -486,7 +494,8 @@ int main(int argc, char *argv[])
 
     	auto diff = localEndIt - localStartIt;
     	std::cout << "diff: " << diff << '\n';
-    	std::cout << "localEndIt->label: " << localEndIt->label << '\n';
+    	std::cout << "localStartIt->label: " << localStartIt->label << '\n';
+        std::cout << "localEndIt->label: " << (localEndIt-1)->label<< '\n';
 
 		FILE.write((char*)&(*localStartIt), (localEndIt - localStartIt) * sizeof(SequenceLabel));
 		localStartIt = localEndIt;
