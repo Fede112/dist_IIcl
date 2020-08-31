@@ -126,88 +126,102 @@ std::vector<SequenceLabel> filtering(std::vector<SequenceLabel> & sequences)
     auto low = sequences.cbegin();
 
     while (low != end)
-    {   
-        std::vector<SequenceLabel> sameSearchBuff;
-        sameSearchBuff.reserve(100000);
-        uint32_t sIDref = low->sID;
-
-        // find last occurrence
-        auto high = std::upper_bound(low, end, sIDref, compare_sID());
-
-        if ((high-1)->label != low->label)
-        {
-            high = std::lower_bound(low, high, low->label, compare_label());
-            high += 1;
-        }
+    {
+        // find last occurrence with same label
+        uint32_t labelref = low->label;
+        auto high_l = std::upper_bound(low, end, labelref, compare_label());
     
+        while (low != high_l)
+        {   
+            std::vector<SequenceLabel> sameSearchBuff;
+            sameSearchBuff.reserve(100000);
+            uint32_t sIDref = low->sID;
 
-        assert((high-1)->label == low->label);
-        assert((high-1)->sID == low->sID);
+            // find last occurrence
+            auto high = std::upper_bound(low, high_l, sIDref, compare_sID());
 
-        // compute the difference
-        auto count = high - low;
-
-        if(count == 1){low = low + count; continue;}
+            // if ((high-1)->label != low->label)
+            // {
+            //     std::cout << "HERE!" << std::endl;
+            //     printSL(*(high-1));
+            //     high = std::lower_bound(low, high, low->label, compare_label());
+            //     high += 1;
+            // }
         
 
+            assert((high-1)->label == low->label);
+            assert((high-1)->sID == low->sID);
 
-        // choose sequences which appear more than one
-        // and that overlaps with itself.
-        // (e.g. 12314 12 41 && 12314 10 39 [sID ss se])
-        for (auto itr_i = low; itr_i < high; ++itr_i)
-        {
-            for (auto itr_j = low; itr_j < high; ++itr_j)
+            // compute the difference
+            auto count = high - low;
+            // std::cout << "count: " << count << '\n';
+            // std::cout << "sIDref: " << sIDref << '\n';
+
+            if(count == 1){low = low + count; continue;}
+            
+
+
+            // choose sequences which appear more than one
+            // and that overlaps with itself.
+            // (e.g. 12314 12 41 && 12314 10 39 [sID ss se])
+            for (auto itr_i = low; itr_i < high; ++itr_i)
             {
-                if(itr_i == itr_j){continue;}
-
-                if (dist(*itr_i, *itr_j)<0.2)
+                for (auto itr_j = low; itr_j < high; ++itr_j)
                 {
-                    sameSearchBuff.emplace_back(*itr_i);
-                    break;
+                    if(itr_i == itr_j){continue;}
+
+                    if (dist(*itr_i, *itr_j)<0.2)
+                    {
+                        sameSearchBuff.emplace_back(*itr_i);
+                        break;
+                    }
                 }
             }
-        }
 
-        if (sameSearchBuff.size()==0){low = low + count; continue;}
+            // getchar();
 
-        // calculate average sequence among overlapped seq
-        SequenceLabel avgSequence;
-        avgSequence.sID = sIDref;
-        size_t sstartAcc{0}; // avoid avgSequence overflow
-        size_t sendAcc{0};
-        for (const auto & seq: sameSearchBuff)
-        {
-            sstartAcc += seq.sstart;
-            sendAcc += seq.send;
-        }
+            if (sameSearchBuff.size()==0){low = low + count; continue;}
 
-        avgSequence.sstart = sstartAcc / sameSearchBuff.size();
-        avgSequence.send = sendAcc / sameSearchBuff.size();
-
-        // std::cout << "avg sequence: ";
-        // printSL(avgSequence);
-
-        // find the sequence which best represents the average sequence (dist metric) 
-        double minDist = 1;
-        SequenceLabel exponentSequence;
-        for (auto & seq: sameSearchBuff)
-        {
-            auto distToAvg = dist(avgSequence, seq);
-            // std::cout << "distToAvg: " << distToAvg << '\n';
-            if (minDist >= distToAvg)
+            // calculate average sequence among overlapped seq
+            SequenceLabel avgSequence;
+            avgSequence.sID = sIDref;
+            size_t sstartAcc{0}; // avoid avgSequence overflow
+            size_t sendAcc{0};
+            for (const auto & seq: sameSearchBuff)
             {
-                exponentSequence = seq;
-                minDist = distToAvg;
+                sstartAcc += seq.sstart;
+                sendAcc += seq.send;
             }
+
+            avgSequence.sstart = sstartAcc / sameSearchBuff.size();
+            avgSequence.send = sendAcc / sameSearchBuff.size();
+
+            // std::cout << "avg sequence: ";
+            // printSL(avgSequence);
+
+            // find the sequence which best represents the average sequence (dist metric) 
+            double minDist = 1;
+            SequenceLabel exponentSequence;
+            for (auto & seq: sameSearchBuff)
+            {
+                auto distToAvg = dist(avgSequence, seq);
+                // std::cout << "distToAvg: " << distToAvg << '\n';
+                if (minDist >= distToAvg)
+                {
+                    exponentSequence = seq;
+                    minDist = distToAvg;
+                }
+            }
+
+            sequencesFiltered.push_back(exponentSequence); 
+
+            // std::cout << "exponentSequence: ";
+            // printSL(exponentSequence);
+
+            // move to next element in vector (not immediate next)
+            low = low + count;
+
         }
-
-        sequencesFiltered.push_back(exponentSequence); 
-
-        // std::cout << "exponentSequence: ";
-        // printSL(exponentSequence);
-
-        // move to next element in vector (not immediate next)
-        low = low + count;
 
     }
 
