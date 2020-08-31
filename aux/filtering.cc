@@ -60,7 +60,7 @@ struct compare_sID
 // print a ClusteredAlignment TO STDOUT
 inline void printSL( const SequenceLabel & sl) 
 {
-    std::cout <<  sl.sID << " " << sl.sstart << " " << sl.send <<  " " << sl.label << std::endl;   
+    std::cout <<  sl.sID << " " << sl.sstart << " " << sl.send <<  " " << sl.label; // << std::endl;   
 }
 
 
@@ -120,7 +120,9 @@ std::vector<SequenceLabel> filtering(std::vector<SequenceLabel> & sequences)
 {
     
     std::vector<SequenceLabel> sequencesFiltered;
-    sequencesFiltered.reserve(sequences.size()/6);
+    sequencesFiltered.reserve(sequences.size()/10);
+    // std::vector<double> distances;
+    // distances.reserve(sequences.size()/10);
 
     auto end = sequences.cend();
     auto low = sequences.cbegin();
@@ -139,15 +141,6 @@ std::vector<SequenceLabel> filtering(std::vector<SequenceLabel> & sequences)
 
             // find last occurrence
             auto high = std::upper_bound(low, high_l, sIDref, compare_sID());
-
-            // if ((high-1)->label != low->label)
-            // {
-            //     std::cout << "HERE!" << std::endl;
-            //     printSL(*(high-1));
-            //     high = std::lower_bound(low, high, low->label, compare_label());
-            //     high += 1;
-            // }
-        
 
             assert((high-1)->label == low->label);
             assert((high-1)->sID == low->sID);
@@ -214,6 +207,7 @@ std::vector<SequenceLabel> filtering(std::vector<SequenceLabel> & sequences)
             }
 
             sequencesFiltered.push_back(exponentSequence); 
+            // distances.push_back(minDist);
 
             // std::cout << "exponentSequence: ";
             // printSL(exponentSequence);
@@ -229,17 +223,127 @@ std::vector<SequenceLabel> filtering(std::vector<SequenceLabel> & sequences)
 }
 
 
+
+std::vector<std::pair<SequenceLabel, double>> filtering_dist(std::vector<SequenceLabel> & sequences)
+{
+    
+    std::vector<std::pair<SequenceLabel, double>> sequencesFiltered;
+    sequencesFiltered.reserve(sequences.size()/10);
+
+    auto end = sequences.cend();
+    auto low = sequences.cbegin();
+
+    while (low != end)
+    {
+        // find last occurrence with same label
+        uint32_t labelref = low->label;
+        auto high_l = std::upper_bound(low, end, labelref, compare_label());
+    
+        while (low != high_l)
+        {   
+            std::vector<SequenceLabel> sameSearchBuff;
+            sameSearchBuff.reserve(100000);
+            uint32_t sIDref = low->sID;
+
+            // find last occurrence
+            auto high = std::upper_bound(low, high_l, sIDref, compare_sID());
+
+            assert((high-1)->label == low->label);
+            assert((high-1)->sID == low->sID);
+
+            // compute the difference
+            auto count = high - low;
+            // std::cout << "count: " << count << '\n';
+            // std::cout << "sIDref: " << sIDref << '\n';
+
+            if(count == 1){low = low + count; continue;}
+            
+
+
+            // choose sequences which appear more than one
+            // and that overlaps with itself.
+            // (e.g. 12314 12 41 && 12314 10 39 [sID ss se])
+            for (auto itr_i = low; itr_i < high; ++itr_i)
+            {
+                for (auto itr_j = low; itr_j < high; ++itr_j)
+                {
+                    if(itr_i == itr_j){continue;}
+
+                    if (dist(*itr_i, *itr_j)<0.2)
+                    {
+                        sameSearchBuff.emplace_back(*itr_i);
+                        break;
+                    }
+                }
+            }
+
+            // getchar();
+
+            if (sameSearchBuff.size()==0){low = low + count; continue;}
+
+            // calculate average sequence among overlapped seq
+            SequenceLabel avgSequence;
+            avgSequence.sID = sIDref;
+            size_t sstartAcc{0}; // avoid avgSequence overflow
+            size_t sendAcc{0};
+            for (const auto & seq: sameSearchBuff)
+            {
+                sstartAcc += seq.sstart;
+                sendAcc += seq.send;
+            }
+
+            avgSequence.sstart = sstartAcc / sameSearchBuff.size();
+            avgSequence.send = sendAcc / sameSearchBuff.size();
+
+            // std::cout << "avg sequence: ";
+            // printSL(avgSequence);
+
+            // find the sequence which best represents the average sequence (dist metric) 
+            double minDist = 1;
+            SequenceLabel exponentSequence;
+            for (auto & seq: sameSearchBuff)
+            {
+                auto distToAvg = dist(avgSequence, seq);
+                // std::cout << "distToAvg: " << distToAvg << '\n';
+                if (minDist >= distToAvg)
+                {
+                    exponentSequence = seq;
+                    minDist = distToAvg;
+                }
+            }
+
+
+
+            sequencesFiltered.push_back(std::make_pair(exponentSequence,minDist)); 
+            // distances.push_back(minDist);
+
+            // std::cout << "exponentSequence: ";
+            // printSL(exponentSequence);
+
+            // move to next element in vector (not immediate next)
+            low = low + count;
+
+        }
+
+    }
+
+    return sequencesFiltered;
+}
+
+
+
 int main(int argc, char const *argv[])
 {
 
     std::unordered_map<uint32_t, std::string> dict;
     std::vector<SequenceLabel> sequences;
-    std::vector<SequenceLabel> sequencesFiltered;
+    // std::vector<SequenceLabel> sequencesFiltered;
+    std::vector<std::pair<SequenceLabel, double>> sequencesFiltered;
     std::string fileName = argv[1];
     load_file(fileName, sequences);
 
     // std::cout << "Filtering!" << std::endl;
-    sequencesFiltered = filtering(sequences);
+    sequencesFiltered = filtering_dist(sequences);
 
 
     // std::cout << "sequences.size(): " << sequences.size() << '\n';
@@ -248,7 +352,8 @@ int main(int argc, char const *argv[])
 
     for (size_t i = 0; i < sequencesFiltered.size(); ++i)
     {
-        printSL(sequencesFiltered[i]);
+        printSL(sequencesFiltered[i].first);
+        std::cout << ' ' << sequencesFiltered[i].second << '\n';
     }
 
 
