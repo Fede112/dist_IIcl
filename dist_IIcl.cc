@@ -564,7 +564,9 @@ int main(int argc, char **argv)
         {
             if (label[entry.ID1] < 0 || label[entry.ID2] < 0) continue;
             if (label[entry.ID1] == label[entry.ID2]) continue;
-            mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += (1. - entry.distance);
+            mcDistanceMat.at(label[entry.ID1], label[entry.ID2]) += (1. - entry.distance); 
+            // we use the complement of the distance because our dist_Icl doesn't have 1. entries.
+            // the trick is:  Pcomp = 1-sum(dist(ID1,ID2))/n and Pc = 1-Pcomp
         }
 
     }
